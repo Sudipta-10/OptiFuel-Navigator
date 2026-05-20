@@ -1,0 +1,523 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Fuel Route Optimizer</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;600;700&display=swap" rel="stylesheet">
+    
+    <!-- Leaflet Maps CSS -->
+    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+    
+    <style>
+        :root {
+            --bg-color: #0f172a;
+            --surface-color: #1e293b;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --text-main: #f8fafc;
+            --text-muted: #94a3b8;
+            --border-color: #334155;
+            --accent: #10b981;
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Outfit', sans-serif;
+        }
+
+        body {
+            background-color: var(--bg-color);
+            color: var(--text-main);
+            min-height: 100vh;
+            display: flex;
+            flex-direction: column;
+        }
+
+        header {
+            padding: 1.5rem 2rem;
+            background: rgba(30, 41, 59, 0.8);
+            backdrop-filter: blur(12px);
+            border-bottom: 1px solid var(--border-color);
+            position: sticky;
+            top: 0;
+            z-index: 1000;
+        }
+
+        h1 {
+            font-size: 1.5rem;
+            font-weight: 700;
+            background: linear-gradient(to right, #3b82f6, #8b5cf6);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .container {
+            display: grid;
+            grid-template-columns: 350px 1fr;
+            gap: 2rem;
+            padding: 2rem;
+            flex-grow: 1;
+            height: calc(100vh - 75px);
+        }
+
+        .panel {
+            background-color: var(--surface-color);
+            border-radius: 16px;
+            padding: 1.5rem;
+            border: 1px solid var(--border-color);
+            display: flex;
+            flex-direction: column;
+            gap: 1.5rem;
+            overflow-y: auto;
+            box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+        }
+
+        .input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 0.5rem;
+        }
+
+        label {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+        }
+
+        input {
+            padding: 0.8rem 1rem;
+            border-radius: 8px;
+            background: #0f172a;
+            border: 1px solid var(--border-color);
+            color: white;
+            font-size: 1rem;
+            outline: none;
+            transition: border-color 0.2s, box-shadow 0.2s;
+        }
+
+        input:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.2);
+        }
+
+        button {
+            background: var(--primary);
+            color: white;
+            border: none;
+            padding: 0.8rem 1.5rem;
+            border-radius: 8px;
+            font-size: 1rem;
+            font-weight: 600;
+            cursor: pointer;
+            transition: all 0.2s;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            gap: 0.5rem;
+        }
+
+        button:hover {
+            background: var(--primary-hover);
+            transform: translateY(-1px);
+        }
+
+        button:disabled {
+            opacity: 0.7;
+            cursor: not-allowed;
+            transform: none;
+        }
+
+        .loader {
+            width: 20px;
+            height: 20px;
+            border: 3px solid rgba(255,255,255,0.3);
+            border-radius: 50%;
+            border-top-color: white;
+            animation: spin 1s ease-in-out infinite;
+            display: none;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .results {
+            display: none;
+            flex-direction: column;
+            gap: 1.5rem;
+            animation: fadeIn 0.4s ease-out;
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(10px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        .summary-card {
+            background: linear-gradient(145deg, #1e293b, #0f172a);
+            padding: 1.2rem;
+            border-radius: 12px;
+            border: 1px solid #3b82f640;
+        }
+
+        .summary-stat {
+            display: flex;
+            justify-content: space-between;
+            margin-bottom: 0.5rem;
+            font-size: 0.95rem;
+        }
+        
+        .summary-stat.total {
+            margin-top: 1rem;
+            padding-top: 1rem;
+            border-top: 1px solid var(--border-color);
+            font-size: 1.1rem;
+            font-weight: 700;
+            color: var(--accent);
+        }
+
+        .stops-list {
+            display: flex;
+            flex-direction: column;
+            gap: 1rem;
+        }
+
+        .stop-item {
+            background: #0f172a;
+            padding: 1rem;
+            border-radius: 8px;
+            border-left: 4px solid var(--accent);
+        }
+
+        .stop-item h4 {
+            margin-bottom: 0.3rem;
+            font-size: 1rem;
+        }
+
+        .stop-item p {
+            color: var(--text-muted);
+            font-size: 0.85rem;
+            margin-bottom: 0.2rem;
+        }
+
+        .stop-item .price {
+            font-weight: 600;
+            color: var(--primary);
+            margin-top: 0.5rem;
+        }
+
+        #map {
+            width: 100%;
+            height: 100%;
+            border-radius: 16px;
+            border: 1px solid var(--border-color);
+            background: #1e293b;
+        }
+        
+        .error-message {
+            color: #ef4444;
+            background: rgba(239, 68, 68, 0.1);
+            padding: 1rem;
+            border-radius: 8px;
+            border: 1px solid rgba(239, 68, 68, 0.2);
+            display: none;
+            font-size: 0.9rem;
+        }
+
+        /* Custom scrollbar for panel */
+        .panel::-webkit-scrollbar {
+            width: 8px;
+        }
+        .panel::-webkit-scrollbar-track {
+            background: rgba(0,0,0,0.1);
+            border-radius: 10px;
+        }
+        .panel::-webkit-scrollbar-thumb {
+            background: var(--border-color);
+            border-radius: 10px;
+        }
+        
+        @media (max-width: 768px) {
+            .container {
+                grid-template-columns: 1fr;
+                height: auto;
+            }
+            #map {
+                height: 400px;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <header>
+        <h1>📍 Fuel Route Optimizer</h1>
+    </header>
+
+    <div class="container">
+        <!-- Sidebar Panel -->
+        <div class="panel">
+            <form id="routeForm">
+                <div class="input-group">
+                    <label for="start">Starting Location</label>
+                    <input type="text" id="start" placeholder="e.g. New York, NY" required>
+                </div>
+                
+                <div class="input-group">
+                    <label for="finish">Destination</label>
+                    <input type="text" id="finish" placeholder="e.g. Los Angeles, CA" required>
+                </div>
+
+                <button type="submit" id="submitBtn">
+                    <span>Find Optimal Route</span>
+                    <div class="loader" id="btnLoader"></div>
+                </button>
+            </form>
+            
+            <!-- CSV Upload Section -->
+            <div class="upload-section" style="border-top: 1px solid var(--border-color); margin-top: 0.5rem; padding-top: 1.5rem;">
+                <label style="display:block; margin-bottom: 0.5rem;">Upload Fuel CSV Data</label>
+                <div style="display: flex; gap: 0.5rem; flex-direction: column;">
+                    <input type="file" id="csvFile" accept=".csv" style="padding: 0.5rem; font-size: 0.85rem; border: 1px dashed var(--border-color); background: transparent;">
+                    <button id="uploadBtn" type="button" style="background: var(--surface-color); border: 1px solid var(--border-color); color: var(--text-main); font-size: 0.9rem; padding: 0.6rem;">
+                        <span id="uploadText">Upload & Process</span>
+                    </button>
+                    <div id="uploadStatus" style="font-size: 0.85rem; color: var(--accent); display: none; margin-top: 0.3rem;"></div>
+                </div>
+            </div>
+
+            <div id="errorBox" class="error-message"></div>
+
+            <div class="results" id="resultsSection">
+                <h3>Trip Summary</h3>
+                <div class="summary-card">
+                    <div class="summary-stat">
+                        <span class="text-muted">Total Distance</span>
+                        <span id="resDistance">0 miles</span>
+                    </div>
+                    <div class="summary-stat">
+                        <span class="text-muted">Fuel Consumed</span>
+                        <span id="resGallons">0 gal</span>
+                    </div>
+                    <div class="summary-stat total">
+                        <span>Total Fuel Cost</span>
+                        <span id="resCost">$0.00</span>
+                    </div>
+                </div>
+
+                <h3>Recommended Stops</h3>
+                <div class="stops-list" id="stopsList">
+                    <!-- Stops will be injected here -->
+                </div>
+            </div>
+        </div>
+
+        <!-- Map Area -->
+        <div id="map"></div>
+    </div>
+
+    <!-- Leaflet Maps JS -->
+    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+    <script>
+        // Initialize Map
+        const map = L.map('map').setView([39.8283, -98.5795], 4); // Center of US
+        
+        // Use a beautiful dark map tile layer
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_all/{z}/{x}/{y}{r}.png', {
+            attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+            subdomains: 'abcd',
+            maxZoom: 19
+        }).addTo(map);
+
+        let currentRouteLayer = null;
+        let markers = [];
+
+        // Define a custom gas station icon
+        const gasIcon = L.divIcon({
+            html: '<div style="background:#10b981; color:white; border-radius:50%; width:24px; height:24px; display:flex; align-items:center; justify-content:center; border:2px solid white; box-shadow:0 2px 5px rgba(0,0,0,0.3); font-size:12px;">⛽</div>',
+            className: 'custom-div-icon',
+            iconSize: [24, 24],
+            iconAnchor: [12, 12]
+        });
+        
+        const startIcon = L.divIcon({
+            html: '<div style="background:#3b82f6; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow:0 2px 5px rgba(0,0,0,0.5);"></div>',
+            className: 'custom-div-icon',
+            iconSize: [16, 16]
+        });
+
+        const endIcon = L.divIcon({
+            html: '<div style="background:#ef4444; width:16px; height:16px; border-radius:50%; border:3px solid white; box-shadow:0 2px 5px rgba(0,0,0,0.5);"></div>',
+            className: 'custom-div-icon',
+            iconSize: [16, 16]
+        });
+
+        function clearMap() {
+            if (currentRouteLayer) {
+                map.removeLayer(currentRouteLayer);
+            }
+            markers.forEach(marker => map.removeLayer(marker));
+            markers = [];
+        }
+
+        // CSV Upload Logic
+        document.getElementById('uploadBtn').addEventListener('click', async () => {
+            const fileInput = document.getElementById('csvFile');
+            const statusDiv = document.getElementById('uploadStatus');
+            const btn = document.getElementById('uploadBtn');
+            const uploadText = document.getElementById('uploadText');
+            
+            if (!fileInput.files.length) {
+                statusDiv.textContent = "Please select a CSV file first.";
+                statusDiv.style.color = "#ef4444";
+                statusDiv.style.display = "block";
+                return;
+            }
+
+            const formData = new FormData();
+            formData.append('file', fileInput.files[0]);
+
+            // UI Loading state
+            btn.disabled = true;
+            uploadText.textContent = "Uploading...";
+            statusDiv.style.display = "none";
+
+            try {
+                const response = await fetch('/api/upload/', {
+                    method: 'POST',
+                    body: formData
+                });
+                const data = await response.json();
+                
+                if (response.ok) {
+                    statusDiv.textContent = data.message;
+                    statusDiv.style.color = "#10b981"; // Success green
+                } else {
+                    throw new Error(data.error || "Upload failed");
+                }
+            } catch (error) {
+                statusDiv.textContent = error.message;
+                statusDiv.style.color = "#ef4444"; // Error red
+            } finally {
+                btn.disabled = false;
+                uploadText.textContent = "Upload & Process";
+                statusDiv.style.display = "block";
+            }
+        });
+
+        document.getElementById('routeForm').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            
+            const start = document.getElementById('start').value;
+            const finish = document.getElementById('finish').value;
+            const btn = document.getElementById('submitBtn');
+            const btnText = btn.querySelector('span');
+            const loader = document.getElementById('btnLoader');
+            const resultsSection = document.getElementById('resultsSection');
+            const errorBox = document.getElementById('errorBox');
+            
+            // UI Loading state
+            btn.disabled = true;
+            btnText.style.display = 'none';
+            loader.style.display = 'block';
+            resultsSection.style.display = 'none';
+            errorBox.style.display = 'none';
+            
+            try {
+                const response = await fetch('/api/route/', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ start, finish })
+                });
+                
+                const data = await response.json();
+                
+                if (!response.ok) {
+                    throw new Error(data.error || 'Something went wrong');
+                }
+
+                // Render Summary
+                document.getElementById('resDistance').textContent = `${data.route.total_distance_miles} miles`;
+                document.getElementById('resGallons').textContent = `${data.summary.total_gallons_used} gal`;
+                document.getElementById('resCost').textContent = `$${data.summary.total_fuel_cost}`;
+
+                // Render Stops list
+                const stopsList = document.getElementById('stopsList');
+                stopsList.innerHTML = '';
+                
+                if (data.fuel_stops.length === 0) {
+                    stopsList.innerHTML = '<div class="stop-item"><p>No fuel stops needed for this trip.</p></div>';
+                } else {
+                    data.fuel_stops.forEach((stop, index) => {
+                        stopsList.innerHTML += `
+                            <div class="stop-item">
+                                <h4>${index + 1}. ${stop.name}</h4>
+                                <p>${stop.city}, ${stop.state}</p>
+                                <p>Gallons to buy: <strong>${stop.gallons_to_purchase}</strong></p>
+                                <div class="price">$${stop.price_per_gallon} / gal</div>
+                            </div>
+                        `;
+                    });
+                }
+
+                // Show results
+                resultsSection.style.display = 'flex';
+
+                // Map rendering
+                clearMap();
+                
+                // Draw route line
+                if (data.route.geojson) {
+                    // GeoJSON format from API uses [lon, lat], Leaflet uses [lat, lon] natively for L.polyline
+                    // But L.geoJSON handles the flip automatically!
+                    currentRouteLayer = L.geoJSON(data.route.geojson, {
+                        style: {
+                            color: '#3b82f6',
+                            weight: 5,
+                            opacity: 0.8
+                        }
+                    }).addTo(map);
+                    
+                    // Fit map bounds to route
+                    map.fitBounds(currentRouteLayer.getBounds(), { padding: [50, 50] });
+                    
+                    // Add start and end markers
+                    const coords = data.route.geojson.coordinates;
+                    const startCoord = coords[0];
+                    const endCoord = coords[coords.length - 1];
+                    
+                    markers.push(L.marker([startCoord[1], startCoord[0]], {icon: startIcon})
+                        .bindPopup("<strong>Start</strong><br>" + start)
+                        .addTo(map));
+                        
+                    markers.push(L.marker([endCoord[1], endCoord[0]], {icon: endIcon})
+                        .bindPopup("<strong>Finish</strong><br>" + finish)
+                        .addTo(map));
+                }
+
+                // Add Fuel Stop markers
+                data.fuel_stops.forEach(stop => {
+                    const marker = L.marker([stop.latitude, stop.longitude], {icon: gasIcon})
+                        .bindPopup(`<strong>${stop.name}</strong><br>$${stop.price_per_gallon}/gal`)
+                        .addTo(map);
+                    markers.push(marker);
+                });
+
+            } catch (error) {
+                errorBox.textContent = error.message;
+                errorBox.style.display = 'block';
+            } finally {
+                // Restore button UI
+                btn.disabled = false;
+                btnText.style.display = 'block';
+                loader.style.display = 'none';
+            }
+        });
+    </script>
+</body>
+</html>
