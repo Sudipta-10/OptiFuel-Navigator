@@ -33,21 +33,25 @@ def optimize_fuel_stops(route_data, stations_queryset):
     for station in stations:
         station_loc = (station.latitude, station.longitude)
         
-        # Find closest waypoint
-        closest_dist = float('inf')
-        closest_mile_marker = 0
+        # Find closest waypoint using fast Euclidean distance first
+        closest_sq_dist = float('inf')
+        closest_idx = 0
         
-        # Optimization: step by 10 to quickly find rough location, then fine-tune if needed
-        # Or just evaluate all waypoints (there might be thousands though for long trips)
-        # We can just evaluate all waypoints, it's fast enough in python
         for i, wp in enumerate(waypoints):
-            dist = geodesic(station_loc, wp).miles
-            if dist < closest_dist:
-                closest_dist = dist
-                closest_mile_marker = cumulative_miles[i]
+            lat_diff = station_loc[0] - wp[0]
+            lon_diff = station_loc[1] - wp[1]
+            sq_dist = lat_diff*lat_diff + lon_diff*lon_diff
+            if sq_dist < closest_sq_dist:
+                closest_sq_dist = sq_dist
+                closest_idx = i
+                
+        # Calculate actual geodesic distance only for the closest waypoint
+        closest_wp = waypoints[closest_idx]
+        actual_dist = geodesic(station_loc, closest_wp).miles
+        closest_mile_marker = cumulative_miles[closest_idx]
                 
         # Only keep stations within 10 miles laterally
-        if closest_dist <= 10.0:
+        if actual_dist <= 10.0:
             valid_stations.append({
                 'station': station,
                 'mile_marker': closest_mile_marker

@@ -443,8 +443,8 @@
 
                 // Render Summary
                 document.getElementById('resDistance').textContent = `${data.route.total_distance_miles} miles`;
-                document.getElementById('resGallons').textContent = `${data.summary.total_gallons_used} gal`;
-                document.getElementById('resCost').textContent = `$${data.summary.total_fuel_cost}`;
+                document.getElementById('resGallons').textContent = `${data.summary.total_gallons} gal`;
+                document.getElementById('resCost').textContent = `$${data.summary.total_fuel_cost_usd}`;
 
                 // Render Stops list
                 const stopsList = document.getElementById('stopsList');
@@ -456,10 +456,10 @@
                     data.fuel_stops.forEach((stop, index) => {
                         stopsList.innerHTML += `
                             <div class="stop-item">
-                                <h4>${index + 1}. ${stop.name}</h4>
-                                <p>${stop.city}, ${stop.state}</p>
-                                <p>Gallons to buy: <strong>${stop.gallons_to_purchase}</strong></p>
-                                <div class="price">$${stop.price_per_gallon} / gal</div>
+                                <h4>${index + 1}. ${stop.station_name}</h4>
+                                <p>${stop.address}</p>
+                                <p>Gallons to buy: <strong>${stop.gallons_purchased}</strong></p>
+                                <div class="price">$${stop.retail_price_per_gallon} / gal</div>
                             </div>
                         `;
                     });
@@ -503,7 +503,7 @@
                 // Add Fuel Stop markers
                 data.fuel_stops.forEach(stop => {
                     const marker = L.marker([stop.latitude, stop.longitude], {icon: gasIcon})
-                        .bindPopup(`<strong>${stop.name}</strong><br>$${stop.price_per_gallon}/gal`)
+                        .bindPopup(`<strong>${stop.station_name}</strong><br>$${stop.retail_price_per_gallon}/gal`)
                         .addTo(map);
                     markers.push(marker);
                 });
