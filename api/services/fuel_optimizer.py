@@ -43,9 +43,10 @@ def optimize_fuel_stops(route_data, stations_queryset):
         # Find closest waypoint using fast Euclidean distance and skipping points
         closest_sq_dist = float('inf')
         closest_idx = 0
+        # Step dynamically to keep iterations minimal. Cap at 500 checks per station.
+        step = max(1, len(waypoints) // 500)
         
-        # Step by 10 to reduce iterations by 90% (plenty accurate for this scale)
-        for i in range(0, len(waypoints), 10):
+        for i in range(0, len(waypoints), step):
             wp = waypoints[i]
             lat_diff = station_loc[0] - wp[0]
             lon_diff = station_loc[1] - wp[1]
