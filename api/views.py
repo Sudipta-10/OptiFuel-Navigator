@@ -9,6 +9,7 @@ from rest_framework.parsers import MultiPartParser, FormParser
 import threading
 import os
 from django.core.management import call_command
+from django.core.cache import cache
 from django.conf import settings
 
 class RouteView(APIView):
@@ -65,15 +66,33 @@ class UploadCSVView(APIView):
             for chunk in file_obj.chunks():
                 destination.write(chunk)
                 
+        # Set initial cache status
+        cache.set('upload_status', 'starting', timeout=3600)
+        cache.set('upload_progress', 0, timeout=3600)
+        cache.set('upload_total', 100, timeout=3600)
+                
         # Run the management command in a background thread so we don't block the UI
         def run_loader():
             try:
                 call_command('load_fuel_data', file=file_path)
             except Exception as e:
                 print(f"Error loading CSV in background: {e}")
+                cache.set('upload_status', 'error', timeout=3600)
                 
         thread = threading.Thread(target=run_loader)
         thread.daemon = True
         thread.start()
 
-        return Response({"message": "File uploaded successfully! Data is now being processed in the background."}, status=status.HTTP_200_OK)
+        return Response({"message": "File uploaded! Processing started..."}, status=status.HTTP_200_OK)
+
+class UploadStatusView(APIView):
+    def get(self, request):
+        status_val = cache.get('upload_status', 'idle')
+        progress = cache.get('upload_progress', 0)
+        total = cache.get('upload_total', 100)
+        
+        return Response({
+            "status": status_val,
+            "progress": progress,
+            "total": total
+        }, status=status.HTTP_200_OK)

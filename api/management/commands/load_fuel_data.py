@@ -1,6 +1,7 @@
 import csv
 import time
 from django.core.management.base import BaseCommand
+from django.core.cache import cache
 from api.models import FuelStation
 from api.services.geocoder import geocode
 
@@ -35,6 +36,10 @@ class Command(BaseCommand):
         
         self.stdout.write(f'Parsed {len(stations_dict)} unique stations')
         
+        cache.set('upload_status', 'processing', timeout=3600)
+        cache.set('upload_total', len(stations_dict), timeout=3600)
+        cache.set('upload_progress', 0, timeout=3600)
+        
         bulk_list = []
         count = 0
         for opis_id, data in stations_dict.items():
@@ -62,6 +67,8 @@ class Command(BaseCommand):
             ))
             
             count += 1
+            if count % 10 == 0:
+                cache.set('upload_progress', count, timeout=3600)
             if count % 100 == 0:
                 self.stdout.write(f"Processed {count} stations")
                 
@@ -69,3 +76,5 @@ class Command(BaseCommand):
         FuelStation.objects.bulk_create(bulk_list)
         
         self.stdout.write(self.style.SUCCESS(f'Successfully loaded {len(bulk_list)} stations'))
+        cache.set('upload_status', 'completed', timeout=3600)
+        cache.set('upload_progress', len(stations_dict), timeout=3600)
