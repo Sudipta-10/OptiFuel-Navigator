@@ -3,3 +3,5 @@ djangorestframework>=3.15
 geopy>=2.4
 requests>=2.31
 polyline>=2.0
+gunicorn
+whitenoise
