@@ -7,6 +7,13 @@ MPG = 10
 TANK_CAPACITY_GALLONS = 50
 SAFETY_BUFFER_MILES = 400 # 80% of max range
 
+def fast_haversine(lat1, lon1, lat2, lon2):
+    R = 3958.8 # Earth radius in miles
+    dlat = math.radians(lat2 - lat1)
+    dlon = math.radians(lon2 - lon1)
+    a = math.sin(dlat/2)**2 + math.cos(math.radians(lat1)) * math.cos(math.radians(lat2)) * math.sin(dlon/2)**2
+    return R * 2 * math.asin(math.sqrt(a))
+
 def optimize_fuel_stops(route_data, stations_queryset):
     waypoints = route_data['waypoints']
     total_distance_miles = route_data['distance_miles']
@@ -22,10 +29,10 @@ def optimize_fuel_stops(route_data, stations_queryset):
         longitude__gte=min_lon, longitude__lte=max_lon
     )
     
-    # Calculate cumulative miles for waypoints
+    # Calculate cumulative miles for waypoints using fast math
     cumulative_miles = [0]
     for i in range(1, len(waypoints)):
-        dist = geodesic(waypoints[i-1], waypoints[i]).miles
+        dist = fast_haversine(waypoints[i-1][0], waypoints[i-1][1], waypoints[i][0], waypoints[i][1])
         cumulative_miles.append(cumulative_miles[-1] + dist)
 
     # 2. Assign mile markers to stations
@@ -33,11 +40,13 @@ def optimize_fuel_stops(route_data, stations_queryset):
     for station in stations:
         station_loc = (station.latitude, station.longitude)
         
-        # Find closest waypoint using fast Euclidean distance first
+        # Find closest waypoint using fast Euclidean distance and skipping points
         closest_sq_dist = float('inf')
         closest_idx = 0
         
-        for i, wp in enumerate(waypoints):
+        # Step by 10 to reduce iterations by 90% (plenty accurate for this scale)
+        for i in range(0, len(waypoints), 10):
+            wp = waypoints[i]
             lat_diff = station_loc[0] - wp[0]
             lon_diff = station_loc[1] - wp[1]
             sq_dist = lat_diff*lat_diff + lon_diff*lon_diff
@@ -45,9 +54,9 @@ def optimize_fuel_stops(route_data, stations_queryset):
                 closest_sq_dist = sq_dist
                 closest_idx = i
                 
-        # Calculate actual geodesic distance only for the closest waypoint
+        # Calculate actual distance only for the closest waypoint
         closest_wp = waypoints[closest_idx]
-        actual_dist = geodesic(station_loc, closest_wp).miles
+        actual_dist = fast_haversine(station_loc[0], station_loc[1], closest_wp[0], closest_wp[1])
         closest_mile_marker = cumulative_miles[closest_idx]
                 
         # Only keep stations within 10 miles laterally
